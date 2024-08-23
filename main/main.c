@@ -23,6 +23,37 @@
 
 #define GATTS_TAG "ESP_SOIL_METER"
 
+#define PROFILE_A_APP_ID 0
+
+static esp_ble_adv_params_t adv_params = {
+  .adv_int_min        = 0x20,
+  .adv_int_max        = 0x40,
+  .adv_type           = ADV_TYPE_IND,
+  .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
+  //.peer_addr            =
+  //.peer_addr_type       =
+  .channel_map        = ADV_CHNL_ALL,
+  .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+};
+
+static bool adv_event_done = false;
+
+static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
+{
+  
+}
+
+static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
+  if(event == ESP_GATTS_REG_EVT) {
+    if(param->reg.status == ESP_GATT_OK) {
+      gl_profile_tab[param->reg.app_id] = gatts_if;
+    } else {
+      ESP_LOGI(GATTS_TAG, "Reg app failed");
+      return;
+    }
+  }
+}
+
 void app_main(void)
 {
     printf("Hello world!\n");
