@@ -23,7 +23,23 @@
 
 #define GATTS_TAG "ESP_SOIL_METER"
 
+#define PROFILE_NUM 1
 #define PROFILE_A_APP_ID 0
+
+struct gatts_profile_inst {
+  esp_gatts_cb_t gatts_cb;
+  uint16_t gatts_if;
+  uint16_t app_id;
+  uint16_t conn_id;
+  uint16_t service_handle;
+  esp_gatt_srvc_id_t service_id;
+  uint16_t char_handle;
+  esp_bt_uuid_t char_uuid;
+  esp_gatt_perm_t perm;
+  esp_gatt_char_prop_t property;
+  uint16_t descr_handle;
+  esp_bt_uuid_t descr_uuid;
+};
 
 static esp_ble_adv_params_t adv_params = {
   .adv_int_min        = 0x20,
@@ -36,6 +52,15 @@ static esp_ble_adv_params_t adv_params = {
   .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
+static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+
+static struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
+  [PROFILE_A_APP_ID] = {
+    .gatts_cb = gatts_profile_a_event_handler,
+    .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
+  }
+};
+
 static bool adv_event_done = false;
 
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
@@ -46,12 +71,16 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
   if(event == ESP_GATTS_REG_EVT) {
     if(param->reg.status == ESP_GATT_OK) {
-      gl_profile_tab[param->reg.app_id] = gatts_if;
+      gl_profile_tab[param->reg.app_id].gatts_if = gatts_if;
     } else {
       ESP_LOGI(GATTS_TAG, "Reg app failed");
       return;
     }
   }
+}
+
+static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
+  
 }
 
 void app_main(void)
