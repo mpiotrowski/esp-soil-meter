@@ -13,8 +13,8 @@
 #include "esp_flash.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "nvs_flash.h"
-
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 #include "esp_gap_ble_api.h"
@@ -61,6 +61,14 @@ static struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
   }
 };
 
+static void soil_meter_callback(void* arg);
+
+static esp_timer_create_args_t soil_meter_timer_args = {
+  .callback = soil_meter_callback
+};
+
+static esp_timer_handle_t soil_meter_timer = NULL;
+
 static bool adv_event_done = false;
 
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
@@ -77,9 +85,26 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
       return;
     }
   }
+
+  for(int idx = 0; idx < PROFILE_NUM; idx++){
+    if(gatts_if == ESP_GATT_IF_NONE || gatts_if == gl_profile_tab[idx].gatts_if) {
+      gl_profile_tab[idx].gatts_cb(event, gatts_if, param);
+    }
+  }
 }
 
 static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
+  switch(event) {
+    case ESP_GATTS_CONNECT_EVT:
+      esp_timer_start_periodic(soil_meter_timer, 20*1000*1000); //20 seconds
+      break;  
+    default:
+      break;
+  }  
+}
+
+
+static void soil_meter_callback(void* arg) {
   
 }
 
@@ -136,7 +161,6 @@ void app_main(void)
       ESP_LOGE(GATTS_TAG, "%s initialize controller failed: %s", __func__, esp_err_to_name(ret));
       return;
     }
-
     ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
     if (ret) {
       ESP_LOGE(GATTS_TAG, "%s enable controller failed: %s", __func__, esp_err_to_name(ret));
@@ -175,6 +199,13 @@ void app_main(void)
     esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(500);
     if (local_mtu_ret){
       ESP_LOGE(GATTS_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
+      return;
+    }
+
+    ret = esp_timer_create(&soil_meter_timer_args, &soil_meter_timer);
+    if (ret) {
+      ESP_LOGE(GATTS_TAG, "unable to register a timer, error code = %x", ret);
+      return;
     }
 
     return;
