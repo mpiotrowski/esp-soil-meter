@@ -24,6 +24,10 @@
 #include "esp_gatt_common_api.h"
 #include "esp_gatts_api.h"
 
+#include "soil_meter.pb.h"
+#include "pb_encode.h"
+#include "pb_decode.h"
+
 #define GATTS_TAG "ESP_SOIL_METER"
 #define DEVICE_NAME "ESP_SOIL_METER"
 
@@ -437,12 +441,20 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 static void soil_meter_callback(void *arg)
 {
   ESP_LOGE(GATTS_TAG, "Timer goes off");
-  uint8_t notify_data[15];
-  for (int i = 0; i < sizeof(notify_data); ++i)
-  {
-    notify_data[i] = esp_random() % 0xff;
-  }
-  esp_ble_gatts_send_indicate(gatt_if, conn_id, gl_profile_tab[PROFILE_A_APP_ID].char_handle, sizeof(notify_data), notify_data, true);
+
+  uint8_t buffer[128];
+  
+  soilmeter_SoilUpdate soil_update = soilmeter_SoilUpdate_init_default;
+  pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+
+  char name[] = "Test meter 1";
+  strncpy(soil_update.meter_name, name, sizeof(soil_update.meter_name));
+  soil_update.temperature = 32.1;
+  soil_update.soil_moisture = 500;
+
+  pb_encode(&stream, soilmeter_SoilUpdate_fields, &soil_update);
+  
+  esp_ble_gatts_send_indicate(gatt_if, conn_id, gl_profile_tab[PROFILE_A_APP_ID].char_handle, sizeof(buffer), buffer, true);
 }
 
 void app_main(void)
