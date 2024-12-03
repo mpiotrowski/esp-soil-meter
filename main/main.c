@@ -28,6 +28,12 @@
 #include "pb_encode.h"
 #include "pb_decode.h"
 
+#include "Adafruit_Stemma_soil_sensor.h"
+
+#define I2C_MASTER_NUM 0
+#define I2C_SDA_PIN 21
+#define I2C_SCL_PIN 22
+
 #define GATTS_TAG "ESP_SOIL_METER"
 #define DEVICE_NAME "ESP_SOIL_METER"
 
@@ -499,6 +505,8 @@ void app_main(void)
   ESP_ERROR_CHECK(ret);
 
   ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+
+  ESP_ERROR_CHECK(adafruit_stemma_soil_sensor_init(I2C_MASTER_NUM, I2C_SDA_PIN, I2C_SCL_PIN));
 
   esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
   ret = esp_bt_controller_init(&bt_cfg);
