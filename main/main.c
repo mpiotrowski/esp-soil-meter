@@ -31,8 +31,8 @@
 #include "Adafruit_Stemma_soil_sensor.h"
 
 #define I2C_MASTER_NUM 0
-#define I2C_SDA_PIN 21
-#define I2C_SCL_PIN 22
+#define I2C_SDA_PIN 6
+#define I2C_SCL_PIN 7
 
 #define GATTS_TAG "ESP_SOIL_METER"
 #define DEVICE_NAME "ESP_SOIL_METER"
@@ -43,7 +43,7 @@
 #define scan_rsp_config_flag (1 << 1)
 
 #define GATTS_SERVICE_UUID_TEST_A 0x00FF
-#define GATTS_CHAR_UUID_TEST_A 0xFF01
+#define GATTS_CHAR_UUID_TEST_A 0xFD01
 #define GATTS_DESCR_UUID_TEST_A 0x3333
 #define GATTS_NUM_HANDLE_TEST_A 4
 
@@ -53,13 +53,18 @@ static esp_gatt_if_t gatt_if = 0x00;
 static uint16_t conn_id = 0x00;
 static uint16_t attr_handle = 0x00;
 
+#define ESP_SOIL_CHAR_UUID  { 0x35, 0x34, 0x13, 0x7A, 0xB4, 0x9D, 0xC3, 0xBB, 0x12, 0x45, 0x34, 0x12, 0x00, 0x00, 0x13, 0x14 };
+static uint8_t esp_soil_char_uuid[16] = {
+  0x35, 0x34, 0x13, 0x7A, 0xB4, 0x9D, 0xC3, 0xBB, 0x12, 0x45, 0x34, 0x12, 0x00, 0x00, 0x13, 0x14
+};
+
 static uint8_t adv_event_done = 0;
 static uint8_t adv_service_uuid128[32] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     // first uuid, 16bit, [12],[13] is the value
-    0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xEE, 0x00, 0x00, 0x00,
+    0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xCE, 0x00, 0x00, 0x00,
     // second uuid, 32bit, [12], [13], [14], [15] is the value
-    0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00,
+    0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xDF, 0x00, 0x00, 0x00,
 };
 
 struct gatts_profile_inst
@@ -201,7 +206,6 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 
 static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
-  ESP_LOGI(GATTS_TAG, "gatts_event_handle");
   if (event == ESP_GATTS_REG_EVT)
   {
     if (param->reg.status == ESP_GATT_OK)
@@ -231,8 +235,8 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
     ESP_LOGI(GATTS_TAG, "REGISTER_APP_EVT, status %d, app_id %d", param->reg.status, param->reg.app_id);
     gl_profile_tab[PROFILE_A_APP_ID].service_id.is_primary = true;
     gl_profile_tab[PROFILE_A_APP_ID].service_id.id.inst_id = 0x00;
-    gl_profile_tab[PROFILE_A_APP_ID].service_id.id.uuid.len = ESP_UUID_LEN_16;
-    gl_profile_tab[PROFILE_A_APP_ID].service_id.id.uuid.uuid.uuid16 = 0x00FF;
+    gl_profile_tab[PROFILE_A_APP_ID].service_id.id.uuid.len = ESP_UUID_LEN_128;
+    memcpy(gl_profile_tab[PROFILE_A_APP_ID].service_id.id.uuid.uuid.uuid128, esp_soil_char_uuid, sizeof(esp_soil_char_uuid));
 
     esp_ble_gap_set_device_name(DEVICE_NAME);
     // config adv data
@@ -319,6 +323,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         else if (descr_value == 0x0000)
         {
           ESP_LOGI(GATTS_TAG, "Notification/Indication disable");
+              esp_timer_stop(soil_meter_timer);
         }
         else
         {
@@ -453,10 +458,15 @@ static void soil_meter_callback(void *arg)
   soilmeter_SoilUpdate soil_update = soilmeter_SoilUpdate_init_default;
   pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
 
+  float temp = 0;
+  adafruit_stemma_soil_sensor_read_temperature(I2C_MASTER_NUM, &temp);
+  uint16_t moisture = 0;
+  adafruit_stemma_soil_sensor_read_moisture(I2C_MASTER_NUM, &moisture);
+
   char name[] = "Test meter 1";
   strncpy(soil_update.meter_name, name, sizeof(soil_update.meter_name));
-  soil_update.temperature = 32.1;
-  soil_update.soil_moisture = 500;
+  soil_update.temperature = temp;
+  soil_update.soil_moisture = moisture;
 
   pb_encode(&stream, soilmeter_SoilUpdate_fields, &soil_update);
   
